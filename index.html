@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Find It Nearby</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Find It Nearby</h1>
+      <p class="subtitle">
+        Tap the button, say what you're looking for, and hear the top 3
+        nearby places.
+      </p>
+
+      <button id="speakBtn" data-state="idle" aria-label="Speak your request">
+        <span class="mic-icon" aria-hidden="true"></span>
+        <span class="btn-label">Tap to Speak</span>
+      </button>
+
+      <p id="statusText" class="status" aria-live="polite">
+        Click the button and ask what you're looking for
+      </p>
+
+      <div id="errorBanner" class="error-banner" role="alert" hidden></div>
+
+      <div id="results" class="results" aria-live="polite"></div>
+    </main>
+
+    <script src="config.js"></script>
+    <!-- Google Maps Platform's official dynamic library loader.
+         Lets places.js call google.maps.importLibrary("places") on demand,
+         without a page-load callback and without creating a billed Map object. -->
+    <script>
+      (g => {
+        var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
+        b = b[c] || (b[c] = {});
+        var d = b.maps || (b.maps = {}), r = new Set(), e = new URLSearchParams(),
+          u = () => h || (h = new Promise(async (f, n) => {
+            await (a = m.createElement("script"));
+            e.set("libraries", [...r] + "");
+            for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);
+            e.set("callback", c + ".maps." + q);
+            a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+            d[q] = f;
+            a.onerror = () => h = n(Error(p + " could not load."));
+            a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+            m.head.append(a);
+          }));
+        d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n));
+      })({
+        key: window.GOOGLE_MAPS_API_KEY,
+        v: "weekly",
+      });
+    </script>
+    <script src="speech.js"></script>
+    <script src="places.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

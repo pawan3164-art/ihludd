@@ -1,0 +1,17 @@
+{
+  "name": "find-it-nearby-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend for the Find It Nearby call-agent feature: places outbound calls via Twilio and runs the conversation with Claude.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "twilio": "^5.3.4",
+    "ws": "^8.18.0"
+  }
+}
