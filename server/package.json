@@ -1,14 +1,15 @@
 {
   "name": "find-it-nearby-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Backend for the Find It Nearby call-agent feature: places outbound calls via Twilio and runs the conversation with Claude.",
+  "description": "Backend for the Find It Nearby app: Sarvam AI speech relays for the frontend, and outbound-call handling via Twilio Media Streams + Gemini Live for the delivery-check call agent.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/genai": "^0.10.0",
+    "alawmulaw": "^6.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "twilio": "^5.3.4",

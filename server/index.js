@@ -3,7 +3,22 @@ const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const twilio = require("twilio");
-const { attachConversationRelay } = require("./conversationRelay");
+const { attachMediaStreamBridge } = require("./mediaStreamBridge");
+const { attachSttRelay } = require("./sttRelay");
+const { attachTtsRelay } = require("./ttsRelay");
+const { classifyRequest } = require("./queryExtraction");
+
+// This backend juggles several concurrent WebSocket relays and live call
+// sessions. While the Sarvam/Gemini Live integrations are still being
+// verified against real traffic, a single unexpected message shape
+// throwing synchronously inside one connection's handler should not be able
+// to crash the whole process and kill every other in-progress call —
+// confirmed this was happening (a bad TTS relay send took the entire server
+// down). Individual handlers should still catch their own errors; this is a
+// last-resort net, not a substitute for that.
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception (backend stayed up):", err);
+});
 
 const PORT = process.env.PORT || 3001;
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
@@ -36,6 +51,16 @@ app.use(express.urlencoded({ extended: false })); // Twilio webhooks are form-en
 const callContexts = new Map(); // callSid -> { phoneNumber, shopName, itemQuery, deliveryAddress }
 const callResults = new Map(); // callSid -> { status, ...summary }
 const callTimers = new Map(); // callSid -> Timeout
+
+app.post("/classify-request", async (req, res) => {
+  const { transcript } = req.body;
+  if (!transcript) {
+    res.status(400).json({ error: "Missing transcript." });
+    return;
+  }
+  const result = await classifyRequest(transcript);
+  res.json(result);
+});
 
 app.post("/call-shop", async (req, res) => {
   const { phoneNumber, shopName, itemQuery, deliveryAddress } = req.body;
@@ -91,7 +116,7 @@ app.post("/twiml/connect", (req, res) => {
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <ConversationRelay url="wss://${host}/conversation-relay" />
+    <Stream url="wss://${host}/media-stream" />
   </Connect>
 </Response>`);
 });
@@ -132,8 +157,41 @@ async function forceEndCall(callSid) {
 }
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/conversation-relay" });
-attachConversationRelay(wss, { callContexts, callResults });
+
+// Three WebSocket endpoints share this one HTTP server. Attaching multiple
+// WebSocketServer instances via their automatic `path` option is fragile
+// when more than one shares a server (confirmed: only the first-registered
+// one actually worked, every other path — including nonexistent ones — got
+// a blanket 400). `noServer: true` + manually routing the 'upgrade' event
+// ourselves is the reliable pattern for this.
+const mediaStreamWss = new WebSocketServer({ noServer: true });
+attachMediaStreamBridge(mediaStreamWss, { callContexts, callResults, twilioClient });
+
+const sttRelayWss = new WebSocketServer({ noServer: true });
+attachSttRelay(sttRelayWss);
+
+const ttsRelayWss = new WebSocketServer({ noServer: true });
+attachTtsRelay(ttsRelayWss);
+
+server.on("upgrade", (request, socket, head) => {
+  const { pathname } = new URL(request.url, `http://${request.headers.host}`);
+
+  if (pathname === "/media-stream") {
+    mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
+      mediaStreamWss.emit("connection", ws, request);
+    });
+  } else if (pathname === "/relay/stt") {
+    sttRelayWss.handleUpgrade(request, socket, head, (ws) => {
+      sttRelayWss.emit("connection", ws, request);
+    });
+  } else if (pathname === "/relay/tts") {
+    ttsRelayWss.handleUpgrade(request, socket, head, (ws) => {
+      ttsRelayWss.emit("connection", ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
 
 server.listen(PORT, () => {
   console.log(`Find It Nearby call server listening on port ${PORT}`);
